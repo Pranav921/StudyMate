@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+.venv/
+venv/
+ENV/
+
+# VS Code
+.vscode/
+
+# Streamlit/Flask config
+.streamlit/
+
+# Data
+*.csv
+*.xlsx
+
+# Others
+.DS_Store
