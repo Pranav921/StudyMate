@@ -1,40 +1,61 @@
 import spacy
 import re
-
 nlp = spacy.load("en_core_web_sm")
 
 LEARNING_STYLES = ["videos", "practice", "reading", "flashcards", "quizzes", "projects"]
 
-def parse_user_input(user_input):
-    doc = nlp(user_input)
+def _extract_goal_text(user_input: str):
+    text = user_input.strip()
 
-    goal = None
-    deadline = None
-    learning_preferences = []
-
-    # Extract Goal (Subject)
-    for ent in doc.ents:
-        if ent.label_ in ["ORG", "PRODUCT", "WORK_OF_ART", "EVENT", "LANGUAGE", "PERSON"]:
-            goal = ent.text
-
-    # Fallback for goal (catch noun chunks if no entity detected)
-    if not goal:
-        noun_chunks = [chunk.text for chunk in doc.noun_chunks]
-        if noun_chunks:
-            goal = noun_chunks[0]
-
-    # Extract Deadline (FIXED REGEX for plural and singular forms)
-    deadline_match = re.search(
-    r"(in\s+\d+\s+(?:days|day|weeks|week|months|month)|by\s+next\s+(?:week|month))",
-    user_input.lower()
+    # 1) Prefer explicit patterns like: study [for] <goal> ... / learn <goal> ... / prepare [for] <goal> ...
+    pattern = re.compile(
+        r"(?:study|learn|prepare|prep)(?:\s+for)?\s+(?P<goal>.+?)\s*(?:"
+        r"in\s+\d+\s+(?:days?|weeks?|months?)|"
+        r"by\s+next\s+(?:week|month)|"
+        r"using\b|with\b|for\b|before\b|on\b|by\b|\.|,|$)",
+        flags=re.IGNORECASE
     )
-    if deadline_match:
-        deadline = deadline_match.group()
+    m = pattern.search(text)
+    if m:
+        goal = m.group("goal").strip(" .,:;!")
+        # Clean leading 'for' and articles: for / a / an / the
+        goal = re.sub(r"^(?:for\s+)?(?:a|an|the)\s+", "", goal, flags=re.IGNORECASE)
+        return goal if goal else None
 
-    # Extract Learning Preferences
-    for style in LEARNING_STYLES:
-        if style in user_input.lower():
-            learning_preferences.append(style)
+    # 2) Fallback: spaCy noun chunks (ignore pronouns)
+    doc = nlp(text)
+    noun_chunks = [
+        chunk.text.strip()
+        for chunk in doc.noun_chunks
+        if chunk.root.pos_ != "PRON" and chunk.text.lower() not in {"i", "me", "my"}
+    ]
+    if noun_chunks:
+        noun_chunks.sort(key=len, reverse=True)
+        return noun_chunks[0]
+
+    # 3) Last resort: spaCy entities (ignore pronouns)
+    ents = [
+        ent.text for ent in doc.ents
+        if ent.text.lower() not in {"i", "me", "my"} and ent.label_ in {
+            "ORG", "PRODUCT", "WORK_OF_ART", "EVENT", "LANGUAGE", "PERSON"
+        }
+    ]
+    if ents:
+        ents.sort(key=len, reverse=True)
+        return ents[0]
+
+    return None
+
+def parse_user_input(user_input):
+    goal = _extract_goal_text(user_input)
+
+    deadline_match = re.search(
+        r"(in\s+\d+\s+(?:days?|weeks?|months?)|by\s+next\s+(?:week|month))",
+        user_input.lower()
+    )
+    deadline = deadline_match.group() if deadline_match else None
+
+    learning_preferences = [s for s in LEARNING_STYLES if s in user_input.lower()]
 
     return {
         "goal": goal,
@@ -42,8 +63,6 @@ def parse_user_input(user_input):
         "learning_preferences": learning_preferences
     }
 
-# Test
 if __name__ == "__main__":
-    test_input = "I want to learn Data Structures by next month using videos and projects."
-    result = parse_user_input(test_input)
-    print(result)
+    test_input = "I want to study for a Math midterm in 10 days using videos, practice, reading, and flashcards."
+    print(parse_user_input(test_input))
