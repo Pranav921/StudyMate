@@ -1,34 +1,39 @@
-def create_study_schedule(tasks, total_days, hours_per_day, balanced=True):
+from typing import List, Dict
+
+def create_study_schedule(
+    tasks: List[Dict[str, float]],
+    total_days: int,
+    hours_per_day: float,
+    mode: str = "balanced"
+):
     schedule = [[] for _ in range(total_days)]
     day_totals = [0.0] * total_days
-
     work = tasks[:]
-    if balanced:
-        work.sort(key=lambda t: t["estimated_time"], reverse=True)  # longest first
+    if mode == "balanced":
+        work.sort(key=lambda t: t["estimated_time"], reverse=True)
 
     for task in work:
+        dur = max(0.0, float(task["estimated_time"]))
         placed = False
 
-        if balanced:
-            # Try days with the lowest totals first
+        if mode == "balanced":
             for day in sorted(range(total_days), key=lambda d: day_totals[d]):
-                if day_totals[day] + task["estimated_time"] <= hours_per_day:
+                if day_totals[day] + dur <= hours_per_day:
                     schedule[day].append(task)
-                    day_totals[day] += task["estimated_time"]
+                    day_totals[day] += dur
                     placed = True
                     break
         else:
-            # Original greedy: first day that fits
             for day in range(total_days):
-                if day_totals[day] + task["estimated_time"] <= hours_per_day:
+                if day_totals[day] + dur <= hours_per_day:
                     schedule[day].append(task)
-                    day_totals[day] += task["estimated_time"]
+                    day_totals[day] += dur
                     placed = True
                     break
 
-        if not placed:  # overflow into last day
+        if not placed:
             schedule[-1].append(task)
-            day_totals[-1] += task["estimated_time"]
+            day_totals[-1] += dur
 
     return schedule
 
@@ -41,8 +46,7 @@ if __name__ == "__main__":
     ]
     total_days = 4
     hours_per_day = 3
-
-    schedule = create_study_schedule(tasks, total_days, hours_per_day, balanced=True)
+    schedule = create_study_schedule(tasks, total_days, hours_per_day, mode="balanced")
     for i, day in enumerate(schedule):
         print(f"\nDay {i+1}:")
         for t in day:

@@ -6,11 +6,9 @@ LEARNING_STYLES = ["videos", "practice", "reading", "flashcards", "quizzes", "pr
 
 def _extract_goal_text(user_input: str):
     text = user_input.strip()
-
-    # 1) Prefer explicit patterns like: study [for] <goal> ... / learn <goal> ... / prepare [for] <goal> ...
     pattern = re.compile(
         r"(?:study|learn|prepare|prep)(?:\s+for)?\s+(?P<goal>.+?)\s*(?:"
-        r"in\s+\d+\s+(?:days?|weeks?|months?)|"
+        r"in\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)\s+(?:days?|weeks?|months?)|"
         r"by\s+next\s+(?:week|month)|"
         r"using\b|with\b|for\b|before\b|on\b|by\b|\.|,|$)",
         flags=re.IGNORECASE
@@ -18,11 +16,9 @@ def _extract_goal_text(user_input: str):
     m = pattern.search(text)
     if m:
         goal = m.group("goal").strip(" .,:;!")
-        # Clean leading 'for' and articles: for / a / an / the
         goal = re.sub(r"^(?:for\s+)?(?:a|an|the)\s+", "", goal, flags=re.IGNORECASE)
         return goal if goal else None
 
-    # 2) Fallback: spaCy noun chunks (ignore pronouns)
     doc = nlp(text)
     noun_chunks = [
         chunk.text.strip()
@@ -33,7 +29,6 @@ def _extract_goal_text(user_input: str):
         noun_chunks.sort(key=len, reverse=True)
         return noun_chunks[0]
 
-    # 3) Last resort: spaCy entities (ignore pronouns)
     ents = [
         ent.text for ent in doc.ents
         if ent.text.lower() not in {"i", "me", "my"} and ent.label_ in {
@@ -43,20 +38,17 @@ def _extract_goal_text(user_input: str):
     if ents:
         ents.sort(key=len, reverse=True)
         return ents[0]
-
     return None
 
 def parse_user_input(user_input):
     goal = _extract_goal_text(user_input)
-
     deadline_match = re.search(
-        r"(in\s+\d+\s+(?:days?|weeks?|months?)|by\s+next\s+(?:week|month))",
+        r"(in\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)\s+(?:days?|weeks?|months?)|"
+        r"by\s+next\s+(?:week|month))",
         user_input.lower()
     )
     deadline = deadline_match.group() if deadline_match else None
-
     learning_preferences = [s for s in LEARNING_STYLES if s in user_input.lower()]
-
     return {
         "goal": goal,
         "deadline": deadline,
